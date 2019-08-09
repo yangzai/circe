@@ -2,9 +2,25 @@ package io.circe.tests
 
 import cats.kernel.Eq
 import java.util.UUID
+
 import org.scalacheck.{ Arbitrary, Gen }
 import org.scalacheck.util.Buildable
-import shapeless.{ :+:, ::, AdditiveCollection, CNil, Coproduct, Generic, HList, HNil, Inl, Inr, IsTuple, Nat, Sized }
+import shapeless.{
+  :+:,
+  ::,
+  AdditiveCollection,
+  CNil,
+  Coproduct,
+  Generic,
+  HList,
+  HNil,
+  Inl,
+  Inr,
+  IsTuple,
+  Nat,
+  Sized,
+  Witness
+}
 import shapeless.labelled.{ FieldType, field }
 import shapeless.ops.nat.ToInt
 
@@ -24,14 +40,12 @@ trait MissingInstances {
     Arbitrary(A.arbitrary.map(Tuple1(_)))
 
   implicit def arbitrarySome[A](implicit A: Arbitrary[A]): Arbitrary[Some[A]] = Arbitrary(A.arbitrary.map(Some(_)))
-  implicit lazy val arbitraryNone: Arbitrary[None.type] = Arbitrary(Gen.const(None))
 
   implicit def eqSome[A](implicit A: Eq[A]): Eq[Some[A]] = Eq.by(_.get)
-  implicit lazy val eqNone: Eq[None.type] = Eq.instance((_, _) => true)
 
   implicit lazy val arbitrarySymbol: Arbitrary[Symbol] = Arbitrary(Arbitrary.arbitrary[String].map(Symbol(_)))
 
-  implicit lazy val eqHNil: Eq[HNil] = Eq.instance((_, _) => true)
+  implicit lazy val eqHNil: Eq[HNil] = Eq.by(_ => HNil)
   implicit lazy val eqCNil: Eq[CNil] = Eq.instance((_, _) => false)
 
   implicit def eqHCons[H, T <: HList](implicit eqH: Eq[H], eqT: Eq[T]): Eq[H :: T] =
@@ -52,7 +66,7 @@ trait MissingInstances {
     eqL: Eq[L]
   ): Eq[P] = Eq.by(gen.to)(eqL)
 
-  implicit lazy val arbitraryHNil: Arbitrary[HNil] = Arbitrary(Gen.const(HNil))
+  implicit lazy val arbitraryHNil: Arbitrary[HNil] = Arbitrary(Arbitrary.arbitrary[HNil.type].map(identity))
 
   implicit def arbitraryHCons[H, T <: HList](implicit H: Arbitrary[H], T: Arbitrary[T]): Arbitrary[H :: T] =
     Arbitrary(
@@ -94,4 +108,14 @@ trait MissingInstances {
     toInt: ToInt[L]
   ): Arbitrary[Sized[C[A], L]] =
     Arbitrary(Gen.containerOfN[C, A](toInt(), A.arbitrary).filter(_.size == toInt()).map(Sized.wrap[C[A], L]))
+
+  implicit def eqSingletonType[S: Witness.Aux]: Eq[S] = Eq.allEqual
+
+  //ref: https://github.com/alexarchambault/scalacheck-shapeless
+  // /blob/master/core/shared/src/main/scala/org/scalacheck/derive/Instances.scala
+  implicit def arbitrarySingletonType[S](
+    implicit
+    w: Witness.Aux[S]
+  ): Arbitrary[S] =
+    Arbitrary(Gen.const(w.value))
 }

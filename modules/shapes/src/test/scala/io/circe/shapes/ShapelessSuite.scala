@@ -1,7 +1,7 @@
 package io.circe.shapes
 
-import io.circe.{ Decoder, Encoder }
-import io.circe.literal._
+import io.circe.{ Decoder, Encoder, Json }
+import io.circe.literal.JsonStringContext
 import io.circe.testing.CodecTests
 import io.circe.tests.CirceSuite
 import shapeless.{ :+:, ::, CNil, HNil, Nat, Sized, Witness }
@@ -29,6 +29,8 @@ class ShapelessSuite extends CirceSuite {
   )
   checkLaws("Codec[Sized[List[Int], Nat._4]]", CodecTests[Sized[List[Int], Nat._4]].codec)
   checkLaws("Codec[Sized[Vector[String], Nat._10]]", CodecTests[Sized[Vector[String], Nat._10]].codec)
+  checkLaws("Codec[Witness.`42`.T]", CodecTests[Witness.`42`.T].codec)
+  checkLaws("Codec[None.type]", CodecTests[None.type].codec)
 
   val hlistDecoder = Decoder[String :: Int :: List[Char] :: HNil]
 
@@ -75,5 +77,21 @@ class ShapelessSuite extends CirceSuite {
     val result = sizedDecoder.decodeAccumulating(json"""[ $a, $notIntB, $c, $notIntD ]""".hcursor)
 
     assert(result.swap.exists(_.size == 2))
+  }
+
+  val singletonTypeEncoder = Encoder[Witness.`42`.T]
+  type JNull = Json.Null.type
+
+  "A Singleton Type encoder" should "always encode to the same value" in forAll { s: Witness.`42`.T =>
+    val result = singletonTypeEncoder(s)
+
+    assert(result == json"42")
+  }
+
+  it should "derive without diverging implicit expansion" in {
+    import io.circe.syntax._
+
+    val v: JNull = Json.Null
+    assertCompiles("v.asJson")
   }
 }
